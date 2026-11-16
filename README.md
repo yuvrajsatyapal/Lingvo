@@ -24,7 +24,6 @@
 </div>
 
 ---
-# 🔗 Source — [yuvrajsatyapal/Lingvo](https://github.com/yuvrajsatyapal/Lingvo)
 # ⬇️ Download — [Lingvo for macOS (.dmg)](https://drive.google.com/file/d/1OckmPeD9f_I3ARZn_a1APfug0DL_Q5-V/view?usp=drive_link)
 ---
 
