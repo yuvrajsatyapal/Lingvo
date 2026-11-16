@@ -1,0 +1,18 @@
+[package]
+name = "lingvo-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros", "time", "fs", "io-util"] }
+cpal = "0.18"
+whisper-rs = { version = "0.16", features = ["metal"] }
+ct2rs = { version = "0.11", default-features = false, features = ["sentencepiece", "accelerate"] }
+sentencepiece = "0.14"
+rusqlite = { version = "0.43", features = ["bundled"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json"] }
+futures-util = "0.3"
+zip = { version = "9", default-features = false, features = ["deflate"] }

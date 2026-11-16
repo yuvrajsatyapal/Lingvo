@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["crates/lingvo-core", "src-tauri"]
+
+# No debug info: keeps the build folder small.
+# cpal with a small macOS patch, see vendor/cpal/LINGVO_PATCH.md.
+[patch.crates-io]
+cpal = { path = "vendor/cpal" }
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.dev.package."*"]
+opt-level = 3
+
+# The audio and VAD code runs in real time, so optimise it in dev builds too.
+[profile.dev.package.lingvo-core]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
