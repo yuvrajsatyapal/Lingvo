@@ -19,6 +19,7 @@
 [![pnpm](https://img.shields.io/badge/pnpm-10-F69220?style=flat-square&logo=pnpm&logoColor=white)](https://pnpm.io/)
 [![macOS](https://img.shields.io/badge/macOS-14.6%2B-000000?style=flat-square&logo=apple&logoColor=white)](#local-development)
 [![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M4-555555?style=flat-square&logo=apple&logoColor=white)](#local-development)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](./LICENSE)
 
 </div>
 
@@ -45,7 +46,6 @@
 - [Privacy and Security](#privacy-and-security)
 - [Project Workflow](#project-workflow)
 - [Known Limits](#known-limits)
-- [Roadmap](#roadmap)
 - [License](#license)
 
 ---
@@ -548,15 +548,6 @@ flowchart LR
 
 ---
 
-## Roadmap
-
-- Run Whisper's encoder on the Neural Engine (Core ML) to make the Turbo model usable live
-- Evaluate a stronger multilingual translation model than the Argos packages
-- Rename sessions
-- Windows and Linux builds
-
----
-
 ## License
 
-No license has been chosen for this project yet.
+MIT License — see [LICENSE](./LICENSE) for details.
