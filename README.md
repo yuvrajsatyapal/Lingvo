@@ -52,6 +52,12 @@ On first use, download the Base speech model from the app, press Start, and allo
 
 - Lines trail speech by roughly 1 s; Lingvo only hears audio after it plays. A sentence is released
   once the next one starts or the speaker pauses.
+- Speech model choice decides quality. Measured on an M2 (French speech to English): Base answers in
+  ~0.15 s per pass but mistranslates and drops sentences; **Small is the recommended default** (~0.45 s,
+  accurate); Large v3 Turbo is the most accurate but needs ~1.7 s per pass even on short phrases, which
+  is too slow for live subtitles. Whisper always encodes a padded 30 s window, so a pass costs about the
+  same for 2 s or 8 s of speech. Shrinking that window (`audio_ctx`) was tried and rejected: it dropped
+  sentences.
 - Translating into English works with no extra download. Other targets need translation models,
   two of them when neither language is English.
 - Music or several voices at once reduce accuracy.

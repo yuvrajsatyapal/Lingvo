@@ -27,6 +27,23 @@ pub struct HistoryEntry {
   pub session_id: Option<i64>,
 }
 
+/// One Start-to-Stop run, summarised from its stored lines.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSummary {
+  pub id: i64,
+  /// UTC, ISO 8601: first and last stored line.
+  pub started_at: String,
+  pub ended_at: String,
+  pub line_count: i64,
+  pub source_lang: Option<String>,
+  pub target_lang: String,
+  /// First line spoken, used as the session's title.
+  pub title: String,
+  /// Latest translated line.
+  pub preview: String,
+}
+
 impl Store {
   pub fn open(path: &Path) -> Result<Self> {
     Self::init(Connection::open(path)?)
@@ -133,6 +150,38 @@ impl Store {
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
   }
 
+  /// Newest first. Lines saved before sessions existed (no session id) are not listed.
+  pub fn sessions(&self, limit: u32) -> Result<Vec<SessionSummary>> {
+    let conn = self.conn.lock().unwrap();
+    let mut stmt = conn.prepare(
+      "SELECT h.session_id, MIN(h.created_at), MAX(h.created_at), COUNT(*),
+         (SELECT x.source_lang FROM history x WHERE x.session_id = h.session_id AND x.source_lang IS NOT NULL ORDER BY x.id LIMIT 1),
+         (SELECT x.target_lang FROM history x WHERE x.session_id = h.session_id ORDER BY x.id LIMIT 1),
+         (SELECT COALESCE(x.original, x.translated) FROM history x WHERE x.session_id = h.session_id ORDER BY x.id LIMIT 1),
+         (SELECT x.translated FROM history x WHERE x.session_id = h.session_id ORDER BY x.id DESC LIMIT 1)
+       FROM history h WHERE h.session_id IS NOT NULL
+       GROUP BY h.session_id ORDER BY h.session_id DESC LIMIT ?1",
+    )?;
+    let rows = stmt.query_map(params![limit], |r| {
+      Ok(SessionSummary {
+        id: r.get(0)?,
+        started_at: r.get(1)?,
+        ended_at: r.get(2)?,
+        line_count: r.get(3)?,
+        source_lang: r.get(4)?,
+        target_lang: r.get(5)?,
+        title: r.get(6)?,
+        preview: r.get(7)?,
+      })
+    })?;
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+  }
+
+  pub fn delete_session(&self, session: i64) -> Result<()> {
+    self.conn.lock().unwrap().execute("DELETE FROM history WHERE session_id = ?1", params![session])?;
+    Ok(())
+  }
+
   pub fn clear_history(&self) -> Result<()> {
     self.conn.lock().unwrap().execute("DELETE FROM history", [])?;
     Ok(())
@@ -166,5 +215,25 @@ mod tests {
     assert_eq!(h[1].original.as_deref(), Some("Hola"));
     store.clear_history().unwrap();
     assert!(store.history(10, None).unwrap().is_empty());
+  }
+
+  #[test]
+  fn sessions_are_summarised_and_deletable() {
+    let store = Store::in_memory().unwrap();
+    store.add_history(Some(1), Some("es"), "en", Some("Hola"), "Hello").unwrap();
+    store.add_history(Some(1), Some("es"), "en", Some("Adiós"), "Bye").unwrap();
+    store.add_history(Some(2), Some("fr"), "en", None, "Salut").unwrap();
+    store.add_history(None, None, "en", None, "Legacy").unwrap();
+    let list = store.sessions(10).unwrap();
+    assert_eq!(list.len(), 2);
+    assert_eq!(list[0].id, 2);
+    assert_eq!(list[0].title, "Salut");
+    assert_eq!(list[1].line_count, 2);
+    assert_eq!(list[1].title, "Hola");
+    assert_eq!(list[1].preview, "Bye");
+    assert_eq!(list[1].source_lang.as_deref(), Some("es"));
+    store.delete_session(1).unwrap();
+    assert_eq!(store.sessions(10).unwrap().len(), 1);
+    assert_eq!(store.history(10, None).unwrap().len(), 2);
   }
 }

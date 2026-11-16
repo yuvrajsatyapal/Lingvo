@@ -69,6 +69,34 @@ async fn main() -> anyhow::Result<()> {
         }
       }
     }
+    Some("asrtime") => {
+      // Plain transcription timing: `probe asrtime <wav> [model]`.
+      let audio = read_wav_16k_mono(&args[2]);
+      let model = args.get(3).map(String::as_str).unwrap_or("base");
+      let mut rec = WhisperRecognizer::load(&paths.whisper_file(model).expect("model not installed"), true)?;
+      for secs in [2usize, 4, 8] {
+        let clip = &audio[..(secs * 16_000).min(audio.len())];
+        let opts = AsrOptions { language: Some("fr".into()), translate_to_english: false, beam_size: None };
+        let runs: Vec<_> = (0..3)
+          .map(|_| {
+            let t = Instant::now();
+            rec.transcribe(clip, &opts).expect("transcribe");
+            t.elapsed().as_millis()
+          })
+          .collect();
+        println!("{model} {secs}s {runs:?} ms");
+      }
+    }
+    Some("mt") => {
+      // Translation quality and speed on tricky sentences: `probe mt <from> <to> <sentence>...`.
+      let mut tr = ArgosTranslator::new(paths.translate_dir());
+      let _ = tr.translate("warm up", &args[2], &args[3], false);
+      for sentence in &args[4..] {
+        let t = Instant::now();
+        let out = tr.translate(sentence, &args[2], &args[3], false)?;
+        println!("{:>4} ms  {out}", t.elapsed().as_millis());
+      }
+    }
     Some("text") => {
       let tools = lingvo_core::tools::Tools::spawn(paths)?;
       let t = Instant::now();
@@ -93,6 +121,9 @@ async fn main() -> anyhow::Result<()> {
       }
       if let Some(m) = args.get(4) {
         settings.whisper_model = m.clone();
+      }
+      if std::env::var("LINGVO_VIA").is_ok_and(|v| v == "0") {
+        settings.english_via_whisper = false;
       }
       let (tx, rx) = std::sync::mpsc::channel();
       let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));

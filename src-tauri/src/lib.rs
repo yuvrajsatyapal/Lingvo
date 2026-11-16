@@ -10,7 +10,7 @@ use lingvo_core::audio::{self, AudioCapture, AudioSourceInfo, CpalCapture};
 use lingvo_core::models::{self, ModelPaths, TranslationPackage, WhisperModel};
 use lingvo_core::pipeline::Engine;
 use lingvo_core::speech::Speaker;
-use lingvo_core::store::{HistoryEntry, Store};
+use lingvo_core::store::{HistoryEntry, SessionSummary, Store};
 use lingvo_core::tools::{Tools, Translation};
 use lingvo_core::types::{EngineState, PipelineEvent, Settings};
 use serde::{Deserialize, Serialize};
@@ -257,6 +257,19 @@ fn get_history(state: State<AppState>, limit: u32, session: Option<i64>) -> CmdR
   state.store.history(limit, session).map_err(err)
 }
 
+#[tauri::command]
+fn list_sessions(state: State<AppState>, limit: u32) -> CmdResult<Vec<SessionSummary>> {
+  state.store.sessions(limit).map_err(err)
+}
+
+#[tauri::command]
+fn delete_session(state: State<AppState>, session: i64) -> CmdResult<()> {
+  if *state.session.lock().unwrap() == Some(session) && state.status.lock().unwrap().running {
+    return Err("Stop translating before deleting this session.".into());
+  }
+  state.store.delete_session(session).map_err(err)
+}
+
 /// Writes the stored lines (one session, or everything) to a text file and returns its path.
 #[tauri::command]
 fn export_transcript(app: AppHandle, session: Option<i64>) -> CmdResult<String> {
@@ -421,6 +434,25 @@ fn raise_above_fullscreen(overlay: &WebviewWindow) {
 #[cfg(not(target_os = "macos"))]
 fn raise_above_fullscreen(_overlay: &WebviewWindow) {}
 
+/// The green button should zoom the window up to its maximum size, not enter full screen.
+#[cfg(target_os = "macos")]
+fn disable_fullscreen(window: &WebviewWindow) {
+  use objc2::msg_send;
+  use objc2::runtime::AnyObject;
+
+  const FULL_SCREEN_NONE: usize = 1 << 9;
+
+  if let Ok(ptr) = window.ns_window() {
+    let window = ptr as *mut AnyObject;
+    unsafe {
+      let _: () = msg_send![window, setCollectionBehavior: FULL_SCREEN_NONE];
+    }
+  }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn disable_fullscreen(_window: &WebviewWindow) {}
+
 pub fn run() {
   let toggle = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyL);
   tauri::Builder::default()
@@ -439,6 +471,10 @@ pub fn run() {
       let store = Store::open(&data_dir.join("lingvo.db"))?;
       let paths = ModelPaths::new(data_dir.join("models"))?;
       let tools = Tools::spawn(paths.clone())?;
+
+      if let Some(main) = app.get_webview_window("main") {
+        disable_fullscreen(&main);
+      }
 
       if let Some(overlay) = app.get_webview_window(OVERLAY) {
         place_overlay(&overlay, &store);
@@ -519,6 +555,8 @@ pub fn run() {
       download_model,
       delete_model,
       get_history,
+      list_sessions,
+      delete_session,
       clear_history,
       export_transcript,
       reveal_file,

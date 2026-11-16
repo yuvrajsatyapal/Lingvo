@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lingvo – Session history prototype</title>
+<style>
+:root {
+  --ink:#000000; --panel:#0c0c0c; --panel-2:#171717; --line:#2b2b2b; --text:#f4f4f2; --muted:#999995;
+  --teal:#ffd666; --teal-strong:#000; --amber:#ffd666; --danger:#ff7a6b; --radius:12px;
+  font-family:-apple-system,'SF Pro Text','Segoe UI',system-ui,sans-serif; font-size:14px; color:var(--text);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:#111;display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap;padding:24px}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;cursor:pointer;transition:border-color .15s,transform .1s}
+button:hover{border-color:var(--teal)} button:active{transform:scale(.98)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+button.small{padding:5px 10px;font-size:13px}
+button.primary{background:#000;border-color:var(--amber);color:var(--amber)}
+button.danger:hover{border-color:var(--danger);color:var(--danger)}
+button.ghost{background:none;border:none;color:var(--muted);padding:6px 8px}
+button.ghost:hover{color:var(--text)}
+.muted{color:var(--muted)}
+
+.window{width:min(440px,100%);height:min(760px,calc(100vh - 48px));min-height:560px;background:var(--ink);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.top{display:flex;justify-content:space-between;align-items:center;padding:18px 18px 12px}
+.brand{display:flex;gap:12px;align-items:center}
+.brand h1{margin:0;font-size:20px;letter-spacing:-.02em}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.brand{min-width:0}.top{gap:8px}
+.mark{width:38px;height:38px;border-radius:11px;padding:9px 7px;background:#000;border:1.5px solid var(--amber);display:flex;flex-direction:column;justify-content:space-between}
+.mark i{display:block;height:4px;border-radius:2px;background:#fff}.mark i:nth-child(1){width:60%;background:var(--amber)}.mark i:nth-child(3){width:72%;align-self:center}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:999px;font-size:12px;background:var(--panel);border:1px solid var(--line);color:var(--text)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--teal)}
+.dot.live{animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.tabs{display:flex;gap:4px;padding:0 14px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.tabs button{flex:none;background:none;border:none;border-bottom:2px solid transparent;border-radius:0;padding:9px 8px;color:var(--muted);font-size:13.5px}
+.tabs button.active{color:var(--text);border-bottom-color:var(--amber)}
+
+.view{flex:1;overflow-y:auto;padding:14px 16px 22px;display:flex;flex-direction:column;gap:12px}
+.toolbar{display:flex;gap:8px;align-items:center}
+.search{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%}
+.search::placeholder{color:var(--muted)}
+.filters{display:flex;gap:6px}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12.5px;color:var(--muted)}
+.chip.active{color:var(--text);border-color:var(--teal);background:#1c1805}
+
+.day{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:6px 2px -2px}
+.session{display:flex;flex-direction:column;gap:9px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;width:100%}
+.session:hover{border-color:var(--teal)}
+.s-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.s-title{font-weight:600;font-size:14.5px;line-height:1.3}
+.s-time{font-size:12px;color:var(--muted);white-space:nowrap}
+.s-preview{margin:0;color:var(--muted);font-size:13px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.s-meta{display:flex;gap:4px 10px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.lang{display:inline-flex;gap:5px;align-items:center;color:var(--text);background:var(--panel-2);border-radius:6px;padding:2px 7px;font-size:12px}
+.lang b{color:var(--amber);font-weight:500}
+.sep{display:none}
+.live-card{border-color:var(--teal);background:linear-gradient(180deg,#1c1805,var(--panel))}
+.live-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--teal)}
+
+.detail-head{display:flex;align-items:center;gap:6px;margin:-4px 0 0 -8px}
+.back{display:inline-flex;gap:4px;align-items:center}
+.d-title{display:flex;flex-direction:column;gap:6px;padding:2px 2px 0}
+.d-title h2{margin:0;font-size:18px;letter-spacing:-.01em;line-height:1.3}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.stat b{display:block;font-size:17px;font-weight:600}
+.stat span{font-size:11.5px;color:var(--muted)}
+.actions{display:flex;gap:8px}
+.actions .grow{flex:1}
+.seg{display:flex;background:var(--ink);border:1px solid var(--line);border-radius:9px;padding:2px}
+.seg button{flex:1;border:none;background:none;padding:6px 10px;border-radius:7px;color:var(--muted);font-size:13px}
+.seg button.active{background:var(--panel-2);color:var(--text)}
+.timeline{display:flex;flex-direction:column}
+.entry{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:11px 0;border-top:1px solid var(--line)}
+.entry:first-child{border-top:none}
+.ts{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:3px}
+.entry p{margin:0;line-height:1.45}
+.entry .orig{color:var(--muted);font-size:13px;margin-bottom:3px}
+.entry .tr{font-size:15px}
+mark{background:#4a3c0a;color:var(--amber);border-radius:3px;padding:0 1px}
+.empty{text-align:center;padding:42px 20px;display:flex;flex-direction:column;gap:8px;align-items:center}
+.empty h3{margin:0;font-size:15px}
+.empty p{margin:0;color:var(--muted);font-size:13px;line-height:1.5;max-width:300px}
+.privacy{font-size:12px;color:var(--muted);text-align:center;margin:4px 0 0}
+.toast{position:absolute;left:50%;bottom:18px;transform:translate(-50%,20px);background:var(--amber);color:#000;font-weight:600;padding:8px 14px;border-radius:999px;opacity:0;transition:.2s;pointer-events:none;font-size:13px}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.confirm{position:absolute;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;padding:24px}
+.confirm.show{display:flex}
+.confirm .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;width:100%}
+.confirm h3{margin:0;font-size:16px}.confirm p{margin:0;color:var(--muted);line-height:1.45;font-size:13px}
+
+.notes{width:300px;align-self:flex-start;color:var(--muted);font-size:13px;line-height:1.55;padding-top:6px}
+.notes h2{color:var(--text);font-size:15px;margin:0 0 8px}
+.notes ul{padding-left:18px;margin:0 0 14px}
+.notes li{margin-bottom:6px}
+.notes b{color:var(--text)}
+.state-switch{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<div class="window" id="win">
+  <header class="top">
+    <div class="brand">
+      <div class="mark"><i></i><i></i><i></i></div>
+      <div><h1>Lingvo</h1><p>Live subtitles in your language</p></div>
+    </div>
+    <span class="pill"><span class="dot live"></span>Listening</span>
+  </header>
+  <nav class="tabs" id="tabs">
+    <button>Live</button><button>Translator</button><button>Subtitles</button><button>Models</button>
+    <button class="active">History</button>
+  </nav>
+  <main class="view" id="view"></main>
+  <div class="toast" id="toast"></div>
+  <div class="confirm" id="confirm">
+    <div class="box">
+      <h3 id="c-title">Delete this session?</h3>
+      <p id="c-body"></p>
+      <div class="actions"><button class="grow" id="c-cancel">Cancel</button><button class="grow danger" id="c-ok">Delete</button></div>
+    </div>
+  </div>
+</div>
+
+<aside class="notes">
+  <h2>Prototype notes</h2>
+  <div class="state-switch">
+    <button class="small chip active" data-state="full">With sessions</button>
+    <button class="small chip" data-state="empty">Empty</button>
+  </div>
+  <ul>
+    <li><b>A session = one Start → Stop.</b> The engine already tags every saved line with a <code>sessionId</code>, so the list is a grouping, no new capture logic.</li>
+    <li><b>List</b> is grouped by day, newest first. The running session is pinned on top and updates live.</li>
+    <li><b>Detail</b> replays the session as a timeline with timestamps. Toggle between translation + original, translation only, or original only.</li>
+    <li>Search works on the list (title, text) and inside a session (highlights matches).</li>
+    <li>Per-session <b>Copy</b>, <b>Save as text</b> and <b>Delete</b>. Clear-all stays available in the list footer.</li>
+    <li>Titles are auto-generated from the first line. Rename is a later step.</li>
+  </ul>
+  <b>Needs backend later:</b> session list query (start/end time, line count, langs), per-session delete, session title.
+</aside>
+
+<script>
+const S = [
+  { id:7, live:true, day:'Today', start:'14:32', dur:'4 min', src:'es', tgt:'en', title:'¿Dónde está la estación de tren?',
+    lines:[
+      ['14:32','¿Dónde está la estación de tren?','Where is the train station?'],
+      ['14:33','Hoy vamos a hablar de la historia de España.','Today we are going to talk about the history of Spain.'],
+      ['14:34','Todo comenzó hace más de dos mil años.','It all began more than two thousand years ago.'],
+    ]},
+  { id:6, day:'Today', start:'11:05', dur:'38 min', src:'fr', tgt:'en', title:'Bonjour tout le monde, bienvenue',
+    lines:[
+      ['11:05','Bonjour tout le monde, bienvenue à notre cours.','Hello everyone, welcome to our class.'],
+      ['11:06','Aujourd’hui nous allons parler de cuisine française.','Today we are going to talk about French cooking.'],
+      ['11:09','Le beurre est la base de presque tout.','Butter is the basis of almost everything.'],
+      ['11:14','Il faut toujours préchauffer le four.','You must always preheat the oven.'],
+      ['11:31','N’oubliez pas de goûter pendant la cuisson.','Don’t forget to taste while it cooks.'],
+    ], count:142 },
+  { id:5, day:'Yesterday', start:'20:10', dur:'1 h 12 min', src:'ja', tgt:'en', title:'今日はとても寒いですね',
+    lines:[
+      ['20:10','今日はとても寒いですね。','It’s very cold today, isn’t it.'],
+      ['20:11','そうですね、雪が降るかもしれません。','Yes, it might snow.'],
+      ['20:15','駅まで一緒に行きましょう。','Let’s go to the station together.'],
+    ], count:318 },
+  { id:4, day:'Yesterday', start:'09:42', dur:'6 min', src:'de', tgt:'en', title:'Guten Morgen, das Meeting beginnt',
+    lines:[
+      ['09:42','Guten Morgen, das Meeting beginnt gleich.','Good morning, the meeting is about to start.'],
+      ['09:44','Bitte schalten Sie Ihr Mikrofon stumm.','Please mute your microphone.'],
+    ], count:21 },
+  { id:3, day:'Mon, Nov 10', start:'18:20', dur:'52 min', src:'es', tgt:'en', title:'Esta noche cocinamos paella',
+    lines:[
+      ['18:20','Esta noche cocinamos paella para todos.','Tonight we’re cooking paella for everyone.'],
+      ['18:25','El secreto es no remover el arroz.','The secret is not to stir the rice.'],
+    ], count:204 },
+];
+S.forEach(s=>{ s.count = s.count ?? s.lines.length });
+const LANG={es:'Spanish',fr:'French',ja:'Japanese',de:'German',en:'English'};
+
+const view=document.getElementById('view');
+let st={ screen:'list', id:null, q:'', filter:'all', mode:'both', empty:false };
+
+const esc=t=>t.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const hl=(t,q)=>{ t=esc(t); if(!q) return t; const r=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','ig'); return t.replace(r,'<mark>$1</mark>'); };
+const langTag=s=>`<span class="lang">${LANG[s.src]} <b>→</b> ${LANG[s.tgt]}</span>`;
+
+function list(){
+  if(st.empty){
+    return `<div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#8fabad" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <h3>No sessions yet</h3><p>Press Start on the Live tab and play a video. Each run is saved here as a session you can reopen later.</p>
+      <button class="primary" style="margin-top:6px">Go to Live</button></div><p class="privacy">Audio is never saved. Only translated text.</p>`;
+  }
+  const q=st.q.trim().toLowerCase();
+  let items=S.filter(s=>{
+    if(st.filter==='today'&&s.day!=='Today') return false;
+    if(!q) return true;
+    return s.title.toLowerCase().includes(q)||s.lines.some(l=>(l[1]+l[2]).toLowerCase().includes(q));
+  });
+  let html=`<div class="toolbar"><input class="search" id="q" type="search" placeholder="Search sessions and lines" value="${esc(st.q)}"></div>
+  <div class="filters"><button class="chip ${st.filter==='all'?'active':''}" data-f="all">All</button><button class="chip ${st.filter==='today'?'active':''}" data-f="today">Today</button></div>`;
+  if(!items.length) return html+`<div class="empty"><h3>No matches</h3><p>Nothing in your sessions mentions “${esc(st.q)}”.</p></div>`;
+  let last='';
+  for(const s of items){
+    if(s.day!==last){ html+=`<div class="day">${s.day}</div>`; last=s.day; }
+    const preview=s.lines[0][2];
+    html+=`<button class="session ${s.live?'live-card':''}" data-id="${s.id}">
+      <div class="s-head"><span class="s-title">${hl(s.title,q)}</span>
+        <span class="s-time">${s.live?'<span class="live-tag"><span class="dot live"></span>Live</span>':s.start}</span></div>
+      <p class="s-preview">${hl(preview,q)}</p>
+      <div class="s-meta">${langTag(s)}<span>${s.count} lines</span><span>${s.dur}</span></div></button>`;
+  }
+  return html+`<div class="actions" style="margin-top:6px"><button class="small danger grow" id="clear">Clear all history</button></div>
+  <p class="privacy">Audio is never saved. Only translated text.</p>`;
+}
+
+function detail(){
+  const s=S.find(x=>x.id===st.id), q=st.q.trim();
+  const rows=s.lines.filter(l=>!q||(l[1]+l[2]).toLowerCase().includes(q.toLowerCase()));
+  let html=`<div class="detail-head"><button class="ghost back" id="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Sessions</button></div>
+  <div class="d-title"><div class="s-meta">${s.live?'<span class="live-tag"><span class="dot live"></span>Live now</span><span class="sep">·</span>':''}${s.day}, ${s.start}</div><h2>${esc(s.title)}</h2></div>
+  <div class="stats"><div class="stat"><b>${s.count}</b><span>Lines</span></div><div class="stat"><b>${s.dur}</b><span>Duration</span></div><div class="stat"><b>${LANG[s.src].slice(0,3)} → ${s.tgt.toUpperCase()}</b><span>Languages</span></div></div>
+  <div class="actions"><button class="small grow" id="copy">Copy</button><button class="small grow" id="save">Save as text</button><button class="small danger" id="del">Delete</button></div>
+  <div class="toolbar"><input class="search" id="q" type="search" placeholder="Search this session" value="${esc(st.q)}"></div>
+  <div class="seg" id="mode"><button data-m="both" class="${st.mode==='both'?'active':''}">Both</button><button data-m="tr" class="${st.mode==='tr'?'active':''}">Translation</button><button data-m="orig" class="${st.mode==='orig'?'active':''}">Original</button></div>
+  <div class="timeline">`;
+  if(!rows.length) html+=`<div class="empty"><h3>No matches in this session</h3></div>`;
+  for(const l of rows){
+    html+=`<div class="entry"><span class="ts">${l[0]}</span><div>
+      ${st.mode!=='tr'?`<p class="orig">${hl(l[1],q)}</p>`:''}${st.mode!=='orig'?`<p class="tr">${hl(l[2],q)}</p>`:''}</div></div>`;
+  }
+  return html+`</div>`;
+}
+
+function render(keepFocus){
+  const had=document.activeElement&&document.activeElement.id==='q';
+  view.innerHTML = st.screen==='list'?list():detail();
+  if(had){ const q=document.getElementById('q'); q.focus(); q.setSelectionRange(q.value.length,q.value.length); }
+}
+
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('show'),1800); }
+function ask(title,body,ok,fn){ document.getElementById('c-title').textContent=title; document.getElementById('c-body').textContent=body; document.getElementById('c-ok').textContent=ok; document.getElementById('confirm').classList.add('show'); ask.fn=fn; }
+document.getElementById('c-cancel').onclick=()=>document.getElementById('confirm').classList.remove('show');
+document.getElementById('c-ok').onclick=()=>{ document.getElementById('confirm').classList.remove('show'); ask.fn&&ask.fn(); };
+
+view.addEventListener('input',e=>{ if(e.target.id==='q'){ st.q=e.target.value; render(); } });
+view.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.id){ st={...st,screen:'detail',id:+b.dataset.id,q:'',mode:'both'}; render(); view.scrollTop=0; }
+  else if(b.dataset.f){ st.filter=b.dataset.f; render(); }
+  else if(b.dataset.m){ st.mode=b.dataset.m; render(); }
+  else if(b.id==='back'){ st={...st,screen:'list',q:''}; render(); }
+  else if(b.id==='copy') toast('Copied to clipboard');
+  else if(b.id==='save') toast('Saved to Documents/Lingvo');
+  else if(b.id==='del'){ const s=S.find(x=>x.id===st.id); ask('Delete this session?',`“${s.title}” and its ${s.count} lines will be removed from this device. This can’t be undone.`,'Delete',()=>{ S.splice(S.indexOf(s),1); st={...st,screen:'list',q:''}; render(); toast('Session deleted'); }); }
+  else if(b.id==='clear') ask('Clear all history?',`All ${S.length} sessions will be removed from this device. This can’t be undone.`,'Clear all',()=>{ S.length=0; st.empty=true; render(); toast('History cleared'); });
+});
+
+document.querySelectorAll('[data-state]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-state]').forEach(x=>x.classList.toggle('active',x===b));
+  st={...st,screen:'list',q:'',empty:b.dataset.state==='empty'}; render();
+});
+render();
+</script>
+</body>
+</html>

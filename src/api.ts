@@ -56,6 +56,7 @@ export interface WhisperModel {
   sizeMb: number
   note: string
   supportsTranslate: boolean
+  recommended: boolean
   installed: boolean
 }
 
@@ -91,6 +92,17 @@ export interface HistoryEntry {
   sessionId: number | null
 }
 
+export interface SessionSummary {
+  id: number
+  startedAt: string
+  endedAt: string
+  lineCount: number
+  sourceLang: string | null
+  targetLang: string
+  title: string
+  preview: string
+}
+
 export interface Translation {
   original: string
   sourceLang: string | null
@@ -109,6 +121,8 @@ export const api = {
   deleteModel: (key: string) => invoke<void>('delete_model', { key }),
   getHistory: (limit: number, session: number | null = null) =>
     invoke<HistoryEntry[]>('get_history', { limit, session }),
+  listSessions: (limit: number) => invoke<SessionSummary[]>('list_sessions', { limit }),
+  deleteSession: (session: number) => invoke<void>('delete_session', { session }),
   exportTranscript: (session: number | null) => invoke<string>('export_transcript', { session }),
   revealFile: (path: string) => invoke<void>('reveal_file', { path }),
   translateText: (text: string, from: string, to: string) =>

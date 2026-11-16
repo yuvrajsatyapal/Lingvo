@@ -30,6 +30,12 @@ const PREVIEW_DUTY_PERCENT: u64 = 60;
 /// A recognition pass slower than this, twice in a row, means the model cannot keep up with speech.
 const SLOW_PASS: Duration = Duration::from_millis(2_000);
 const SLOW_STREAK: u32 = 2;
+/// A finished utterance reuses its last preview when what followed that preview is no longer
+/// than this and quieter than `TAIL_QUIET_RATIO` of the speech before it (the closing pause).
+const REUSE_TAIL_MAX_MS: usize = 700;
+const TAIL_QUIET_RATIO: f32 = 0.5;
+const TAIL_FRAME_MS: usize = 30;
+const SENTENCE_END: [char; 7] = ['.', '!', '?', '。', '！', '？', '…'];
 
 pub struct Engine {
   stop: Arc<AtomicBool>,
@@ -98,6 +104,9 @@ struct Worker<'a> {
   slow: SlowGuard,
   /// Set once the speech model proves too slow; kept apart from `notice`, which translation clears.
   slow_notice: Option<String>,
+  /// The latest preview pass of the utterance in progress: how much audio it heard, and what it
+  /// recognised. Lets the final line skip a second pass over the same speech.
+  last_preview: Option<(usize, Transcript)>,
 }
 
 /// Spots a speech model that is too slow for live use from how long its passes take.
@@ -277,6 +286,7 @@ impl<'a> Worker<'a> {
       model_name: model.name,
       slow: SlowGuard::default(),
       slow_notice: None,
+      last_preview: None,
     })
   }
 
@@ -329,7 +339,17 @@ impl<'a> Worker<'a> {
   fn finish(&mut self, audio: &[f32], id: u64) -> u64 {
     let started = Instant::now();
     let accurate = self.settings.mode == "accurate";
-    if let Some(t) = self.recognize(audio, accurate) {
+    let preview = self.last_preview.take();
+    // Accurate mode re-recognises with beam search, so a greedy preview is never good enough.
+    let reusable = preview.filter(|_| !accurate).and_then(|(heard, t)| tail_is_quiet(audio, heard).then_some(t));
+    let transcript = match reusable {
+      Some(t) => {
+        debug(|| "finish: reused the last preview, nothing new was said".to_string());
+        Some(t)
+      }
+      None => self.recognize(audio, accurate),
+    };
+    if let Some(t) = transcript {
       debug(|| format!("finish: {:?} | released: {:?}", t.text, self.released));
       let (rest, _) = strip_released(&clean(&t.text), &self.released);
       self.finishing = true;
@@ -349,9 +369,11 @@ impl<'a> Worker<'a> {
   fn preview(&mut self, audio: &[f32], id: u64) -> u64 {
     let started = Instant::now();
     let Some(t) = self.recognize(audio, false) else {
+      self.last_preview = None;
       self.emit_status(EngineState::Listening);
       return 0;
     };
+    self.last_preview = Some((audio.len(), t.clone()));
     let language = t.language.clone();
     let (rest, confident) = strip_released(&clean(&t.text), &self.released);
     let mut used = 0;
@@ -462,6 +484,19 @@ fn preview_interval(base: Duration, last_pass: Duration) -> Duration {
   base.max(last_pass * 100 / PREVIEW_DUTY_PERCENT as u32)
 }
 
+/// True when the audio after the first `heard` samples is only the pause that ended the
+/// utterance: short, and quieter than the speech before it. Then a recognition pass over `heard`
+/// already covers everything that was said.
+fn tail_is_quiet(audio: &[f32], heard: usize) -> bool {
+  let frame = SAMPLE_RATE as usize * TAIL_FRAME_MS / 1000;
+  if heard == 0 || heard > audio.len() || audio.len() - heard > SAMPLE_RATE as usize * REUSE_TAIL_MAX_MS / 1000 {
+    return false;
+  }
+  let rms = |chunk: &[f32]| (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len().max(1) as f32).sqrt();
+  let reference = rms(&audio[..heard]);
+  audio[heard..].chunks(frame).all(|f| rms(f) < reference * TAIL_QUIET_RATIO)
+}
+
 fn words(text: &str) -> Vec<String> {
   text
     .split_whitespace()
@@ -480,7 +515,10 @@ fn strip_released(full: &str, released: &str) -> (String, bool) {
   let done = words(released);
   let sentences = split_sentences(full);
   let count = split_sentences(released).len();
-  if sentences.len() >= count {
+  // Sentence counting only works when what was published ended on a whole sentence. A clause
+  // released at a comma is the start of a sentence that continues in the fresh transcript.
+  let ended_on_sentence = released.trim_end().ends_with(SENTENCE_END);
+  if ended_on_sentence && sentences.len() >= count {
     let head_words: usize = sentences[..count].iter().map(|s| s.split_whitespace().count()).sum();
     if head_words.abs_diff(done.len()) <= (done.len() * 2 / 5).max(3) {
       return (sentences[count..].join(" "), true);
@@ -502,7 +540,7 @@ fn strip_released(full: &str, released: &str) -> (String, bool) {
 fn split_finished(text: &str) -> Option<(String, String)> {
   let sentences = split_sentences(text);
   let (last, done) = sentences.split_last()?;
-  let last_complete = last.trim_end().ends_with(['.', '!', '?', '。', '！', '？', '…']);
+  let last_complete = last.trim_end().ends_with(SENTENCE_END);
   let enough_follows = last_complete || last.split_whitespace().count() >= 2 || last.chars().count() >= 8;
   if !done.is_empty() && enough_follows {
     return Some((done.join(" "), last.clone()));
@@ -580,5 +618,132 @@ mod tests {
     assert_eq!(rest("Anything at all", ""), "Anything at all");
     assert_eq!(rest("Good morning", "Good morning everyone."), "");
     assert!(!strip_released("one two three four five six seven eight nine", "Good morning everyone. Today is fine.").1);
+  }
+
+  struct CountingRecognizer {
+    calls: std::rc::Rc<std::cell::Cell<usize>>,
+  }
+
+  impl SpeechRecognizer for CountingRecognizer {
+    fn transcribe(&mut self, _audio: &[f32], _opts: &AsrOptions) -> Result<Transcript> {
+      self.calls.set(self.calls.get() + 1);
+      Ok(Transcript { text: "Hello everyone.".into(), language: Some("en".into()), no_speech_prob: 0.0 })
+    }
+
+    fn supports_translation(&self) -> bool {
+      false
+    }
+  }
+
+  struct PassThrough;
+
+  impl Translator for PassThrough {
+    fn translate(&mut self, text: &str, _from: &str, _to: &str, _draft: bool) -> Result<String> {
+      Ok(text.to_string())
+    }
+
+    fn missing_pairs(&self, _from: &str, _to: &str) -> Vec<(String, String)> {
+      Vec::new()
+    }
+  }
+
+  fn tone(ms: usize, amp: f32) -> Vec<f32> {
+    (0..SAMPLE_RATE as usize * ms / 1000).map(|i| amp * (i as f32 * 0.2).sin()).collect()
+  }
+
+  /// Runs one preview on `heard`, then finishes the utterance `finished`; returns how many
+  /// recognition passes the speech model was asked for.
+  fn recognition_passes(mode: &str, heard: &[f32], finished: &[f32]) -> usize {
+    let calls = std::rc::Rc::new(std::cell::Cell::new(0));
+    let settings = Settings { mode: mode.into(), target_lang: "en".into(), ..Settings::default() };
+    let events = |_: PipelineEvent| {};
+    let mut worker = Worker {
+      settings: &settings,
+      recognizer: Box::new(CountingRecognizer { calls: calls.clone() }),
+      translator: Box::new(PassThrough),
+      on_event: &events,
+      dedupe: Dedupe::default(),
+      detected: None,
+      notice: None,
+      via_whisper: false,
+      released: String::new(),
+      released_lines: 0,
+      finishing: false,
+      keep_original: false,
+      model_name: "test",
+      slow: SlowGuard::default(),
+      slow_notice: None,
+      last_preview: None,
+    };
+    worker.preview(heard, 1);
+    worker.finish(finished, 1);
+    calls.get()
+  }
+
+  #[test]
+  fn reuses_the_preview_when_only_silence_followed_it() {
+    let speech = tone(1_500, 0.3);
+    let mut finished = speech.clone();
+    finished.extend(tone(350, 0.0));
+    assert_eq!(recognition_passes("fast", &speech, &finished), 1);
+  }
+
+  #[test]
+  fn recognises_again_when_speech_followed_the_preview() {
+    let speech = tone(1_500, 0.3);
+    let mut finished = speech.clone();
+    finished.extend(tone(600, 0.3));
+    finished.extend(tone(350, 0.0));
+    assert_eq!(recognition_passes("fast", &speech, &finished), 2);
+  }
+
+  #[test]
+  fn accurate_mode_always_recognises_the_final_line_again() {
+    let speech = tone(1_500, 0.3);
+    let mut finished = speech.clone();
+    finished.extend(tone(350, 0.0));
+    assert_eq!(recognition_passes("accurate", &speech, &finished), 2);
+  }
+
+  #[test]
+  fn does_not_reuse_a_preview_across_utterances() {
+    let calls = std::rc::Rc::new(std::cell::Cell::new(0));
+    let settings = Settings::default();
+    let events = |_: PipelineEvent| {};
+    let mut worker = Worker {
+      settings: &settings,
+      recognizer: Box::new(CountingRecognizer { calls: calls.clone() }),
+      translator: Box::new(PassThrough),
+      on_event: &events,
+      dedupe: Dedupe::default(),
+      detected: None,
+      notice: None,
+      via_whisper: false,
+      released: String::new(),
+      released_lines: 0,
+      finishing: false,
+      keep_original: false,
+      model_name: "test",
+      slow: SlowGuard::default(),
+      slow_notice: None,
+      last_preview: None,
+    };
+    let speech = tone(1_500, 0.3);
+    let mut finished = speech.clone();
+    finished.extend(tone(350, 0.0));
+    worker.preview(&speech, 1);
+    worker.finish(&finished, 1);
+    // A second utterance finishing with no preview of its own must be recognised afresh.
+    worker.finish(&finished, 2);
+    assert_eq!(calls.get(), 2);
+  }
+
+  #[test]
+  fn keeps_the_rest_of_a_sentence_released_only_up_to_a_comma() {
+    // A long sentence is released clause by clause. The text still to come after the last
+    // released clause must not be mistaken for a sentence that was already published.
+    let full = "And we can still see them today, then the Visigoths arrived and later the Arabs, who left very beautiful palaces. If you have time, I recommend visiting Granada in Spring.";
+    let released = "And we can still see them today, then the Visigoths arrived and later the Arabs, who left very beautiful palaces. If you have time,";
+    assert_eq!(strip_released(full, released).0, "I recommend visiting Granada in Spring.");
   }
 }

@@ -45,8 +45,18 @@ impl WhisperRecognizer {
     let path = model_path
       .to_str()
       .ok_or_else(|| anyhow!("model path is not valid UTF-8"))?;
-    let ctx = WhisperContext::new_with_params(path, WhisperContextParameters::default())
-      .map_err(|e| anyhow!("could not load the speech model: {e}"))?;
+    // Flash attention cuts each pass by about a fifth on Metal without changing the output. If a
+    // GPU or model rejects it, fall back to the plain attention path.
+    let mut loaded = Err(anyhow!("no attempt made"));
+    for flash_attn in [true, false] {
+      let mut context_params = WhisperContextParameters::default();
+      context_params.flash_attn(flash_attn);
+      loaded = WhisperContext::new_with_params(path, context_params).map_err(|e| anyhow!("{e}"));
+      if loaded.is_ok() {
+        break;
+      }
+    }
+    let ctx = loaded.map_err(|e| anyhow!("could not load the speech model: {e}"))?;
     let multilingual = ctx.is_multilingual();
     let state = ctx
       .create_state()
