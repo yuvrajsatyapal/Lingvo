@@ -53,7 +53,7 @@ impl Default for Settings {
       source_lang: "auto".into(),
       target_lang: "en".into(),
       audio_source: "system".into(),
-      whisper_model: "base".into(),
+      whisper_model: "small".into(),
       mode: "fast".into(),
       english_via_whisper: true,
       save_history: true,

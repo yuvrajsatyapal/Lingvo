@@ -10,6 +10,12 @@ use sentencepiece::SentencePieceProcessor;
 
 use crate::bpe::BpeTokenizer;
 
+/// Provisional text is replaced a moment later, so it is translated greedily. Finished lines use
+/// a wider beam: it costs about the same time on short sentences and avoids wrong word choices
+/// (measured: "in the morning" instead of "tomorrow morning").
+const DRAFT_BEAM: usize = 1;
+const FINAL_BEAM: usize = 4;
+
 pub trait Translator {
   /// Translates `text`. Returns `MissingModel` (via `missing_pairs`) when a package is absent.
   /// `draft` trades a little quality for speed, for provisional text that will be replaced.
@@ -107,7 +113,7 @@ impl ArgosTranslator {
     }
     let translator = &self.loaded[&key];
     let sentences = split_sentences(text);
-    let options = TranslationOptions::<String, String> { beam_size: if draft { 1 } else { 2 }, ..Default::default() };
+    let options = TranslationOptions::<String, String> { beam_size: if draft { DRAFT_BEAM } else { FINAL_BEAM }, ..Default::default() };
     let results = translator.translate_batch(&sentences, &options, None)?;
     Ok(results.into_iter().map(|(t, _)| t.trim().to_string()).collect::<Vec<_>>().join(" "))
   }

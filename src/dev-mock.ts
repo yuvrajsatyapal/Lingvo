@@ -1,6 +1,6 @@
 // Lets the UI run in a plain browser (`pnpm dev`) with sample data, for layout work only.
 const settings = {
-  sourceLang: 'auto', targetLang: 'en', audioSource: 'system', whisperModel: 'base', mode: 'fast',
+  sourceLang: 'auto', targetLang: 'en', audioSource: 'system', whisperModel: 'small', mode: 'fast',
   englishViaWhisper: true, saveHistory: true, outputMode: 'transcript', speakTranslation: true, muteOriginal: true,
   overlay: { fontSize: 30, textColor: '#ffffff', bgColor: '#000000', bgOpacity: 0.6, maxLines: 2, showOriginal: true },
 }
@@ -24,8 +24,9 @@ const responses: Record<string, (args: Record<string, unknown>) => unknown> = {
   ],
   list_models: () => ({
     whisper: [
-      { id: 'tiny', name: 'Tiny', sizeMb: 75, note: 'Fastest, least accurate', supportsTranslate: true, installed: false },
-      { id: 'base', name: 'Base', sizeMb: 142, note: 'Good balance for most computers', supportsTranslate: true, installed: true },
+      { id: 'tiny', name: 'Tiny', sizeMb: 75, note: 'Fastest, but often wrong', supportsTranslate: true, recommended: false, installed: false },
+      { id: 'base', name: 'Base', sizeMb: 142, note: 'Fast, but translations are often wrong', supportsTranslate: true, recommended: false, installed: true },
+      { id: 'small', name: 'Small', sizeMb: 181, note: 'Accurate and still keeps up with live speech', supportsTranslate: true, recommended: true, installed: true },
     ],
     translation: [
       { fromCode: 'es', toCode: 'en', fromName: 'Spanish', toName: 'English', installed: true },

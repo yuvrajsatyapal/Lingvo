@@ -68,7 +68,7 @@ export function Models(props: {
           return (
             <div key={m.id} className="mrow">
               <div>
-                <b>{m.name}{inUse && <span className="tag">In use</span>}</b> <span className="muted">{m.sizeMb} MB</span>
+                <b>{m.name}{m.recommended && <span className="tag">Recommended</span>}{inUse && <span className="tag tag-use">In use</span>}</b> <span className="muted">{m.sizeMb} MB</span>
                 <span className="note">{m.note}</span>
               </div>
               {action(`whisper:${m.id}`, m.installed, !inUse)}

@@ -49,24 +49,29 @@ pub struct WhisperModel {
   pub note: &'static str,
   /// Whether the model can output English directly (the turbo model cannot).
   pub supports_translate: bool,
+  /// The best choice for live subtitles on a typical Apple Silicon Mac.
+  pub recommended: bool,
   pub installed: bool,
 }
 
 pub fn whisper_catalog() -> Vec<WhisperModel> {
-  let m = |id, name, file, size_mb, note, supports_translate| WhisperModel {
+  let m = |id, name, file, size_mb, note, supports_translate, recommended| WhisperModel {
     id,
     name,
     file,
     size_mb,
     note,
     supports_translate,
+    recommended,
     installed: false,
   };
+  // Notes reflect measured behaviour on an M2: Base answers in ~0.15 s but often mistranslates,
+  // Small in ~0.45 s with accurate output, Turbo needs ~1.7 s per pass even for short phrases.
   vec![
-    m("tiny", "Tiny", "ggml-tiny.bin", 75, "Fastest, least accurate", true),
-    m("base", "Base", "ggml-base.bin", 142, "Good balance for most computers", true),
-    m("small", "Small", "ggml-small-q5_1.bin", 181, "More accurate, slower", true),
-    m("turbo", "Large v3 Turbo", "ggml-large-v3-turbo-q5_0.bin", 547, "Most accurate; needs a translation model", false),
+    m("tiny", "Tiny", "ggml-tiny.bin", 75, "Fastest, but often wrong", true, false),
+    m("base", "Base", "ggml-base.bin", 142, "Fast, but translations are often wrong", true, false),
+    m("small", "Small", "ggml-small-q5_1.bin", 181, "Accurate and still keeps up with live speech", true, true),
+    m("turbo", "Large v3 Turbo", "ggml-large-v3-turbo-q5_0.bin", 547, "Best accuracy, too slow for live subtitles. Good for the Translator tab", false, false),
   ]
 }
 

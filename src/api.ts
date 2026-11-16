@@ -56,6 +56,7 @@ export interface WhisperModel {
   sizeMb: number
   note: string
   supportsTranslate: boolean
+  recommended: boolean
   installed: boolean
 }
 
