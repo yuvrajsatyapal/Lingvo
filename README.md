@@ -25,6 +25,17 @@
 
 ---
 # 🔗 Source — [yuvrajsatyapal/Lingvo](https://github.com/yuvrajsatyapal/Lingvo)
+# ⬇️ Download — [Lingvo for macOS (.dmg)](https://drive.google.com/file/d/1OckmPeD9f_I3ARZn_a1APfug0DL_Q5-V/view?usp=drive_link)
+---
+
+**Requires** a Mac with Apple Silicon (M1–M4) and macOS 14.6 or later. Open the `.dmg` and drag Lingvo into Applications.
+
+The app is not notarized by Apple, so macOS blocks the first launch. To allow it once:
+- **macOS 15 or later:** open Lingvo, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
+- **macOS 14:** right-click Lingvo in Applications, choose **Open**, then **Open** again.
+
+The first run needs an internet connection to download the speech model; after that everything runs on your device.
+
 ---
 
 ## Table of Contents
