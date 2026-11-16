@@ -1,0 +1,25 @@
+{
+  "name": "lingvo-promo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "facts": "tsx scripts/extract-facts.ts",
+    "music": "tsx scripts/synth.ts",
+    "prepare-assets": "npm run facts && npm run music",
+    "studio": "npm run prepare-assets && remotion studio src/index.ts",
+    "render": "npm run prepare-assets && remotion render src/index.ts LingvoPromo out/lingvo-promo.mp4 --codec h264 --crf 16",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.538",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.538"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "@types/react": "19.2.2",
+    "tsx": "4.19.2",
+    "typescript": "5.9.3"
+  }
+}
