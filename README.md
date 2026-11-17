@@ -37,6 +37,14 @@ The first run needs an internet connection to download the speech model; after t
 
 ---
 
+## Demo
+
+<a href="docs/media/lingvo-promo.mp4"><img src="docs/images/promo-preview.gif" alt="Lingvo demo: press Start and live subtitles appear over a Spanish video" width="100%" /></a>
+
+▶️ [Watch the full 30-second video](docs/media/lingvo-promo.mp4)
+
+---
+
 ## Table of Contents
 
 - [Screenshots](#screenshots)
