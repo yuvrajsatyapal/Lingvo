@@ -37,7 +37,7 @@ The first run needs an internet connection to download the speech model; after t
 
 ---
 
-## Demo
+## See it in action
 
 https://github.com/user-attachments/assets/3af0ae96-3b38-4cf6-af06-0d96af11e7a2
 
